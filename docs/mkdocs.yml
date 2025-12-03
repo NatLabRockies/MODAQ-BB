@@ -1,0 +1,14 @@
+site_name: MODAQ BlackBox Docs
+site_url: https://nrel.github.io/MODAQ-BB/
+nav:
+    - Home: index.md
+    - Hardware Overview: h_architecture.md
+    - Software Overview: s_architecture.md
+    - Optional Modules: dev_modules.md
+    - Technical Reference: tech_ref.md
+    - FAQ: FAQ.md
+    - Useful Links: links.md
+    - About: about.md
+markdown_extensions:
+    - footnotes
+theme: readthedocs
