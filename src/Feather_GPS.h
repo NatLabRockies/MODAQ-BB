@@ -88,6 +88,15 @@ void GPSWorkerFunc(void * parameter) {
         Serial.print(" | Time in Loop: ");
         Serial.print(( millis() - loopStart) / 1000);
         Serial.println(" s");
+        appendFile(SD, logFile, "GPS Worker Searching for Fix");
+        
+        UBaseType_t freeHeap = uxTaskGetStackHighWaterMark(NULL);
+        Serial.print("GPS Worker Free Heap: ");
+        Serial.println(freeHeap);
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "GPS Worker Free Heap: %i", freeHeap);
+        appendFile(SD, logFile, buffer);
+
       #endif
       
       if (gps.location.isUpdated(),
@@ -131,7 +140,7 @@ void Task_GPSWorker() {
   xTaskCreatePinnedToCore(
     GPSWorkerFunc, /* Function to implement the task */
     "GPSWorker", /* Name of the task */
-    3000, /* Stack size in words */
+    20000, /* Stack size in words */
     NULL, /* Task input parameter */
     1, /* Priority of the task */
     &GPSWorker, /* Task handle. */
@@ -162,12 +171,20 @@ void GPSMonitorFunc(void * parameter) {
     //   Serial.print(gps.sentencesWithFix());
     //   Serial.println(" s");
     // #endif
+    #ifdef DEBUG_GPS
+      UBaseType_t freeHeap = uxTaskGetStackHighWaterMark(NULL);
+      Serial.print("GPS Monitor Free Heap: ");
+      Serial.println(freeHeap);
+      appendFile(SD, logFile, "GPS Monitor Free Heap:");
+      appendFile(SD, logFile, String(freeHeap).c_str());
+    #endif
       
     switch (notificationValue) {
       
       case 0:
         #ifdef DEBUG_GPS
           Serial.println("GPS data received is IDEAL");
+          appendFile(SD, logFile, "GPS data received is IDEAL");
         #endif
         d = gps.date;
         t = gps.time;
@@ -200,6 +217,7 @@ void GPSMonitorFunc(void * parameter) {
       case 1:
         #ifdef DEBUG_GPS
           Serial.println("GPS data received is NOT IDEAL");
+          appendFile(SD, logFile, "GPS data received is NOT IDEAL");
         #endif
         d = gps.date;
         t = gps.time;
@@ -234,6 +252,7 @@ void GPSMonitorFunc(void * parameter) {
         #ifdef DEBUG_GPS
           Serial.println("Failed To receive new GPS data");
           Serial.println(gpsBuffer);
+          appendFile(SD, logFile, "Failed To receive new GPS data");
         #endif
         
         GPS.sendCommand(PMTK_STANDBY);
@@ -255,6 +274,7 @@ void GPSMonitorFunc(void * parameter) {
     #ifdef DEBUG_GPS
       Serial.println("Failed To receive new GPS data");
       Serial.println(gpsBuffer);
+      appendFile(SD, logFile, "Failed To receive new GPS data\n");
     #endif
 
       GPS.sendCommand(PMTK_STANDBY);
@@ -281,7 +301,7 @@ void Task_GPS_Monitor() {
   xTaskCreatePinnedToCore(
     GPSMonitorFunc, /* Function to implement the task */
     "GPSMonitor", /* Name of the task */
-    3000, /* Stack size in words */
+    20000, /* Stack size in words */
     NULL, /* Task input parameter */
     1, /* Priority of the task */
     &GPSMon, /* Task handle. */

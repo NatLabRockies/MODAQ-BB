@@ -1,4 +1,3 @@
-
 void print_wakeup_reason() {
   esp_sleep_wakeup_cause_t wakeup_reason;
   wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -30,32 +29,66 @@ int execution_state() {
   return state;
 }
 
-void combine_data_buffers() {
+void appendFile(fs::FS &fs, const char *path, const char *message) {
+  #ifdef DEBUG_FILE
+    Serial.printf("Appending to file: %s\n", path);
+  #endif
 
+  File file = fs.open(path, FILE_APPEND);
+  if (!file) {
+    #ifdef DEBUG_FILE
+      Serial.println("Failed to open file for appending");
+    #endif
+    return;
+  }
+  if (file.println(message)) {
+    #ifdef DEBUG_FILE
+      Serial.print("Message appended: ");
+      Serial.println(message);
+    #endif
+  } else {
+    #ifdef DEBUG_FILE
+      Serial.println("Append failed");
+    #endif
+  }
+  file.close();
+}
+
+void combine_data_buffers() {
     const char* gpsN = gpsBuffer;
     const char* accN = imuBuffer;
     const char* pwrN = pwrBuffer;
     const char* comma = ",";
-    // const char* lbrk = "\n";
-    // const char* header = "AT+SBDWT=";
 
-    char* tmp;
-    tmp = (char*)malloc(/*strlen(header)+*/strlen(gpsN)+strlen(accN)+strlen(pwrN)+5); /* make space for the new string (should check the return value ...) */
-    // strcpy(tmp, header);
-    strcpy(tmp, gpsN); /* copy name into the new var */
-    strcat(tmp, comma); /* add the comma */
-    strcat(tmp, accN); /* add the extension */
-    strcat(tmp, comma); /* add the comma */
-    strcat(tmp, pwrN);
-    // strcat(tmp, lbrk); /* add the line break character */
-
+    // Calculate required size with proper bounds
+    size_t required_size = strlen(gpsN) + strlen(accN) + strlen(pwrN) + 2 + 1; // 2 commas + null terminator
+    
+    char* tmp = (char*)malloc(required_size);
+    
+    if (tmp == NULL) {
+        Serial.println("ERROR: Memory allocation failed in combine_data_buffers()");
+        appendFile(SD, logFile, "ERROR: Memory allocation failed in combine_data_buffers()\n");
+        return; // Exit early to prevent crash
+    }
+    
+    // Use snprintf for safe concatenation
+    int written = snprintf(tmp, required_size, "%s,%s,%s", gpsN, accN, pwrN);
+    
+    if (written < 0 || written >= (int)required_size) {
+        Serial.println("ERROR: Buffer overflow in combine_data_buffers()");
+        appendFile(SD, logFile, "ERROR: Buffer overflow in combine_data_buffers()\n");
+        free(tmp);
+        return;
+    }
+    
     int s = strlen(tmp);
     Serial.print("Buffer Size = ");
     Serial.println(s);
-    sprintf(fileBuffer,tmp);
+    
+    // Use snprintf instead of sprintf for safety
+    snprintf(fileBuffer, sizeof(fileBuffer), "%s", tmp);
     
     free(tmp);
-
 }
 
 
@@ -173,31 +206,6 @@ void writeFile(fs::FS &fs, const char *path, const char *message) {
   } else {
     #ifdef DEBUG_FILE
       Serial.println("Write failed");
-    #endif
-  }
-  file.close();
-}
-
-void appendFile(fs::FS &fs, const char *path, const char *message) {
-  #ifdef DEBUG_FILE
-    Serial.printf("Appending to file: %s\n", path);
-  #endif
-
-  File file = fs.open(path, FILE_APPEND);
-  if (!file) {
-    #ifdef DEBUG_FILE
-      Serial.println("Failed to open file for appending");
-    #endif
-    return;
-  }
-  if (file.println(message)) {
-    #ifdef DEBUG_FILE
-      Serial.print("Message appended: ");
-      Serial.println(message);
-    #endif
-  } else {
-    #ifdef DEBUG_FILE
-      Serial.println("Append failed");
     #endif
   }
   file.close();
