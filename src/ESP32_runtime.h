@@ -67,7 +67,7 @@ void combine_data_buffers() {
     
     if (tmp == NULL) {
         Serial.println("ERROR: Memory allocation failed in combine_data_buffers()");
-        appendFile(SD, logFile, "ERROR: Memory allocation failed in combine_data_buffers()\n");
+        appendFile(SD, logFile, "ERROR: Memory allocation failed in combine_data_buffers()");
         return; // Exit early to prevent crash
     }
     
@@ -76,7 +76,7 @@ void combine_data_buffers() {
     
     if (written < 0 || written >= (int)required_size) {
         Serial.println("ERROR: Buffer overflow in combine_data_buffers()");
-        appendFile(SD, logFile, "ERROR: Buffer overflow in combine_data_buffers()\n");
+        appendFile(SD, logFile, "ERROR: Buffer overflow in combine_data_buffers()");
         free(tmp);
         return;
     }

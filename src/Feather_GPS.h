@@ -248,7 +248,7 @@ void GPSMonitorFunc(void * parameter) {
 
       default: 
 
-        sprintf(gpsBuffer, "No Fix ,,,,,,,,,\n");
+        sprintf(gpsBuffer, "No Fix ,,,,,,,,,");
         #ifdef DEBUG_GPS
           Serial.println("Failed To receive new GPS data");
           Serial.println(gpsBuffer);
@@ -269,7 +269,7 @@ void GPSMonitorFunc(void * parameter) {
   }
   else {
       
-    sprintf(gpsBuffer, "No Fix ,,,,,,,,,\n");
+    sprintf(gpsBuffer, "No Fix ,,,,,,,,,");
     
     #ifdef DEBUG_GPS
       Serial.println("Failed To receive new GPS data");

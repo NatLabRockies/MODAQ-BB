@@ -23,6 +23,8 @@ void configureWakeupInterrupt_IMU() {
                                         // The duration is set to 0, meaning the wake-up interrupt will be triggered immediately when the threshold is crossed                
 }
 
+
+
 void IRAM_ATTR wakeUpDetectedIMU() {
   // Serial.println("Wake-up event from the IMU detected!");
   // Add your code to handle the wake-up event here

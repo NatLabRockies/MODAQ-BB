@@ -68,8 +68,8 @@ SemaphoreHandle_t serialSemaphore = NULL;
 SemaphoreHandle_t uartSemaphore = NULL;
 
 DateTime now;
-bool EXT_RTC_INT = false;
-bool EXT_IMU_INT = false;
+volatile bool EXT_RTC_INT = false;
+volatile bool EXT_IMU_INT = false;
 int shortSleep, wakeup;
 
 float busvoltage;
@@ -354,7 +354,7 @@ void setup()
 
       sprintf(logFile, "%s/log-file-%s.csv", logDir, timeBuffer);
       createDir(SD, logDir);
-      writeFile(SD, logFile, "System Booted\nDirectories and Data Files Created");
+      writeFile(SD, logFile, "System Booted\nDirectories and Data Files Created\n");
 
       
 #ifdef DEBUG_MAIN
@@ -380,7 +380,9 @@ void loop()
 
   bool summarizeNow = false;
   int timeSlept;
-  int state = execution_state();
+  int state = -1;
+  
+  // Check interrupt flags first (set by ISRs during runtime)
   if (EXT_RTC_INT)
   {
     EXT_RTC_INT = false;
@@ -390,6 +392,11 @@ void loop()
   {
     EXT_IMU_INT = false;
     state = 1;
+  }
+  else
+  {
+    // Only use deep sleep wakeup cause if no interrupt flag is set
+    state = execution_state();
   }
 
   // State machine to handle different wake up conditions
@@ -461,6 +468,8 @@ void loop()
       {
         vTaskDelay(25);
         tasksComplete = true;
+        unsigned long waitStart = millis();
+        const unsigned long TASK_WAIT_TIMEOUT = 30000; // 30 second timeout
         while (!summarizeNow)
         {
           if (pwrComplete && imuComplete)
@@ -474,6 +483,15 @@ void loop()
             Serial.print("Collected Data: ");
             Serial.println(fileBuffer);
 #endif
+            summarizeNow = true;
+          }
+          else if ((millis() - waitStart) > TASK_WAIT_TIMEOUT)
+          {
+#ifdef DEBUG_MAIN
+            Serial.println("Timeout waiting for tasks - proceeding anyway");
+            appendFile(SD, logFile, "Timeout waiting for tasks - proceeding anyway");
+#endif
+            combine_data_buffers();
             summarizeNow = true;
           }
           else
@@ -499,12 +517,14 @@ void loop()
           {
             Serial.print("sendSBDText failed: error ");
             Serial.println(err);
-            appendFile(SD, logFile, "sendSBDText failed: error ");
-            appendFile(SD, logFile, String(err).c_str());
+            String logBuffer = "sendSBDText failed: error " + String(err);
+            appendFile(SD, logFile, logBuffer.c_str());
             successfulSatTransmission = false;
             if (err == ISBD_SENDRECEIVE_TIMEOUT)
+            {
               Serial.println("Try again with a better view of the sky.");
               appendFile(SD, logFile, "Try again with a better view of the sky");
+            }
           }
           else
           {
