@@ -174,7 +174,7 @@ void ISM330DHCX_worker(void * parameter) {
         #ifdef DEBUG_IMU
           Serial.println("IMU Data Updated: ");
           printIMUData();
-          appendFile(SD, logFile, "IMU Data Updated\n");
+          toLogFile(SD, logFile, "IMU Data Updated");
         #endif
 
         sprintf(imuBuffer, "%s,%s,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%3.1f,%i",dateBuffer, timeBuffer, 
@@ -188,17 +188,18 @@ void ISM330DHCX_worker(void * parameter) {
         vTaskDelay(20);
         #ifdef DEBUG_IMU
           Serial.println("IMU stuck outer");
-          appendFile(SD, logFile, "IMU stuck outer\n");
+          toLogFile(SD, logFile, "IMU stuck outer");
         #endif
       } 
 
     }
   }
   #ifdef DEBUG_IMU
-    Serial.println("finished and closed");
+    Serial.println("IMU finished and closed");
+    toLogFile(SD, logFile, "IMU finished and closed");
   #endif
   imuComplete = true;
-  vTaskDelete(ACCMon);
+  vTaskDelete(NULL);  // Use NULL to delete current task
 }
 
 void Task_ISM330DHCX_Worker() {
