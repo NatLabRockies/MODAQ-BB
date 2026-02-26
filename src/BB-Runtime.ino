@@ -70,7 +70,8 @@ SemaphoreHandle_t uartSemaphore = NULL;
 DateTime now;
 volatile bool EXT_RTC_INT = false;
 volatile bool EXT_IMU_INT = false;
-int shortSleep, wakeup;
+uint32_t collectionStartUnixSec = 0;
+uint32_t collectionDurationSec = 0;
 
 float busvoltage;
 float current_mA;
@@ -379,7 +380,6 @@ void loop()
   vTaskDelay(5);
 
   bool summarizeNow = false;
-  int timeSlept;
   int state = -1;
   
   // Check interrupt flags first (set by ISRs during runtime)
@@ -422,6 +422,7 @@ void loop()
     }
     printTime(now);
 #endif
+    collectionStartUnixSec = now.unixtime();
 
     if (xSemaphoreTake(uartSemaphore, (TickType_t)10) == pdTRUE)
     {
@@ -555,30 +556,30 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    timeSlept = now.unixtime() - shortSleep;
-    if (timeSlept < TIME_TO_SLEEP)
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
+    if (collectionDurationSec < TIME_TO_SLEEP)
     {
 #ifdef DEBUG_MAIN
       Serial.print("Sleeping for: ");
-      Serial.print(TIME_TO_SLEEP - timeSlept);
+      Serial.print(TIME_TO_SLEEP - collectionDurationSec);
       Serial.println(" s");
       appendFile(SD, logFile, "Sleeping for: ");
-      appendFile(SD, logFile, String(TIME_TO_SLEEP - timeSlept).c_str());
+      appendFile(SD, logFile, String(TIME_TO_SLEEP - collectionDurationSec).c_str());
       appendFile(SD, logFile, " s");
 #endif
-      esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - timeSlept) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - collectionDurationSec) * uS_TO_S_FACTOR);
     }
-    else if ((timeSlept > TIME_TO_SLEEP) && ((timeSlept - TIME_TO_SLEEP) < TIME_TO_SLEEP))
+    else if ((collectionDurationSec > TIME_TO_SLEEP) && ((collectionDurationSec - TIME_TO_SLEEP) < TIME_TO_SLEEP))
     {
 #ifdef DEBUG_MAIN
       Serial.print("Sleeping for: ");
-      Serial.print(timeSlept - TIME_TO_SLEEP);
+      Serial.print(collectionDurationSec - TIME_TO_SLEEP);
       Serial.println(" s");
       appendFile(SD, logFile, "Sleeping for: ");
-      appendFile(SD, logFile, String(timeSlept - TIME_TO_SLEEP).c_str());
+      appendFile(SD, logFile, String(collectionDurationSec - TIME_TO_SLEEP).c_str());
       appendFile(SD, logFile, " s");
 #endif
-      esp_sleep_enable_timer_wakeup((timeSlept - TIME_TO_SLEEP) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((collectionDurationSec - TIME_TO_SLEEP) * uS_TO_S_FACTOR);
     }
     else
     {
@@ -673,30 +674,30 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    timeSlept = now.unixtime() - shortSleep;
-    if (timeSlept < TIME_TO_SLEEP)
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
+    if (collectionDurationSec < TIME_TO_SLEEP)
     {
 #ifdef DEBUG_MAIN
       Serial.print("Sleeping for: ");
-      Serial.print(TIME_TO_SLEEP - timeSlept);
+      Serial.print(TIME_TO_SLEEP - collectionDurationSec);
       Serial.println(" s");
       appendFile(SD, logFile, "Sleeping for: ");
-      appendFile(SD, logFile, String(TIME_TO_SLEEP - timeSlept).c_str());
+      appendFile(SD, logFile, String(TIME_TO_SLEEP - collectionDurationSec).c_str());
       appendFile(SD, logFile, " s");
 #endif
-      esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - timeSlept) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - collectionDurationSec) * uS_TO_S_FACTOR);
     }
-    else if ((timeSlept > TIME_TO_SLEEP) && ((timeSlept - TIME_TO_SLEEP) < TIME_TO_SLEEP))
+    else if ((collectionDurationSec > TIME_TO_SLEEP) && ((collectionDurationSec - TIME_TO_SLEEP) < TIME_TO_SLEEP))
     {
 #ifdef DEBUG_MAIN
       Serial.print("Sleeping for: ");
-      Serial.print(timeSlept - TIME_TO_SLEEP);
+      Serial.print(collectionDurationSec - TIME_TO_SLEEP);
       Serial.println(" s");
       appendFile(SD, logFile, "Sleeping for: ");
-      appendFile(SD, logFile, String(timeSlept - TIME_TO_SLEEP).c_str());
+      appendFile(SD, logFile, String(collectionDurationSec - TIME_TO_SLEEP).c_str());
       appendFile(SD, logFile, " s");
 #endif
-      esp_sleep_enable_timer_wakeup((timeSlept - TIME_TO_SLEEP) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((collectionDurationSec - TIME_TO_SLEEP) * uS_TO_S_FACTOR);
     }
     else
     {
@@ -730,7 +731,7 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    shortSleep = now.unixtime();
+    collectionStartUnixSec = now.unixtime();
 
 #ifdef DEBUG_MAIN
     Serial.print(" -- Awoke from ESP32 Internal RTC interrupt -- ");
@@ -790,16 +791,16 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    wakeup = now.unixtime() - shortSleep;
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
 #ifdef DEBUG_MAIN
     Serial.print("Sleeping for: ");
-    Serial.print(TIME_TO_SLEEP - wakeup);
+    Serial.print(TIME_TO_SLEEP - collectionDurationSec);
     Serial.println(" s");
     appendFile(SD, logFile, "Sleeping for: ");
-    appendFile(SD, logFile, String(TIME_TO_SLEEP - wakeup).c_str());
+    appendFile(SD, logFile, String(TIME_TO_SLEEP - collectionDurationSec).c_str());
     appendFile(SD, logFile, " s\n");
 #endif
-    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - wakeup) * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - collectionDurationSec) * uS_TO_S_FACTOR);
     blinkRed(1);
 #ifdef DEBUG_LIGHT
     Serial.println("End Case 2");
@@ -824,7 +825,7 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    shortSleep = now.unixtime();
+    collectionStartUnixSec = now.unixtime();
 
 #ifdef DEBUG_MAIN
     Serial.println(" - - - - - - - - - - - - - - - - - - - - - - - ");
@@ -913,10 +914,10 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    wakeup = now.unixtime() - shortSleep;
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
 #ifdef DEBUG_MAIN
     Serial.print("Sleeping for: ");
-    Serial.print(TIME_TO_SLEEP - wakeup);
+    Serial.print(TIME_TO_SLEEP - collectionDurationSec);
     Serial.println(" s");
 #endif
 
@@ -924,7 +925,7 @@ void loop()
 #ifdef DEBUG_LIGHT
     Serial.println("End Default Case");
 #endif
-    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - wakeup) * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - collectionDurationSec) * uS_TO_S_FACTOR);
   }
 
 #ifdef DEBUG_MAIN
