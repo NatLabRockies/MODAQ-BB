@@ -55,12 +55,19 @@ void appendFile(fs::FS &fs, const char *path, const char *message) {
 }
 
 void toLogFile(fs::FS &fs, const char *path, const char *message) {
+  // Take semaphore to prevent concurrent log writes
+  if (xSemaphoreTake(uartSemaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    Serial.println("ERROR: Failed to acquire UART semaphore in toLogFile()");
+    return;
+  }
+  
   // Calculate proper buffer size: message length + timestamp overhead + null terminator
   size_t msgLen = strlen(message);
   size_t bufSize = msgLen + 64;  // 64 bytes for timestamp prefix
   char *timestamped_message = (char*)malloc(bufSize);
   if (timestamped_message == NULL) {
     Serial.println("ERROR: Memory allocation failed in toLogFile()");
+    xSemaphoreGive(uartSemaphore);
     return;
   }
   char dateBuffer[32] = "MM/DD/YYYY";
@@ -70,6 +77,8 @@ void toLogFile(fs::FS &fs, const char *path, const char *message) {
   snprintf(timestamped_message, bufSize, "[%s %s] %s", dateBuffer, timeBuffer, message);
   appendFile(fs, path, timestamped_message);
   free(timestamped_message);
+  
+  xSemaphoreGive(uartSemaphore);
 }
 
 void combine_data_buffers() {
