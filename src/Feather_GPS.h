@@ -99,7 +99,7 @@ void GPSWorkerFunc(void * parameter) {
 
       #endif
       
-      if (gps.location.isUpdated(),
+      if (gps.location.isUpdated() &&
           gps.satellites.value() > 5) {
           
         xTaskNotify(GPSMon, 0, eSetValueWithOverwrite);
