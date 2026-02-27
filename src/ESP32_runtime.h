@@ -54,6 +54,24 @@ void appendFile(fs::FS &fs, const char *path, const char *message) {
   file.close();
 }
 
+void toLogFile(fs::FS &fs, const char *path, const char *message) {
+  // Calculate proper buffer size: message length + timestamp overhead + null terminator
+  size_t msgLen = strlen(message);
+  size_t bufSize = msgLen + 64;  // 64 bytes for timestamp prefix
+  char *timestamped_message = (char*)malloc(bufSize);
+  if (timestamped_message == NULL) {
+    Serial.println("ERROR: Memory allocation failed in toLogFile()");
+    return;
+  }
+  char dateBuffer[32] = "MM/DD/YYYY";
+  char timeBuffer[32] = "hh:mm:ss";
+  rtc.now().toString(dateBuffer);
+  rtc.now().toString(timeBuffer);
+  snprintf(timestamped_message, bufSize, "[%s %s] %s", dateBuffer, timeBuffer, message);
+  appendFile(fs, path, timestamped_message);
+  free(timestamped_message);
+}
+
 void combine_data_buffers() {
     const char* gpsN = gpsBuffer;
     const char* accN = imuBuffer;
@@ -67,7 +85,7 @@ void combine_data_buffers() {
     
     if (tmp == NULL) {
         Serial.println("ERROR: Memory allocation failed in combine_data_buffers()");
-        appendFile(SD, logFile, "ERROR: Memory allocation failed in combine_data_buffers()");
+        toLogFile(SD, logFile, "ERROR: Memory allocation failed in combine_data_buffers()");
         return; // Exit early to prevent crash
     }
     
@@ -76,7 +94,7 @@ void combine_data_buffers() {
     
     if (written < 0 || written >= (int)required_size) {
         Serial.println("ERROR: Buffer overflow in combine_data_buffers()");
-        appendFile(SD, logFile, "ERROR: Buffer overflow in combine_data_buffers()");
+        toLogFile(SD, logFile, "ERROR: Buffer overflow in combine_data_buffers()");
         free(tmp);
         return;
     }

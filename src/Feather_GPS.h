@@ -88,14 +88,7 @@ void GPSWorkerFunc(void * parameter) {
         Serial.print(" | Time in Loop: ");
         Serial.print(( millis() - loopStart) / 1000);
         Serial.println(" s");
-        appendFile(SD, logFile, "GPS Worker Searching for Fix");
-        
-        UBaseType_t freeHeap = uxTaskGetStackHighWaterMark(NULL);
-        Serial.print("GPS Worker Free Heap: ");
-        Serial.println(freeHeap);
-        char buffer[64];
-        snprintf(buffer, sizeof(buffer), "GPS Worker Free Heap: %i", freeHeap);
-        appendFile(SD, logFile, buffer);
+        toLogFile(SD, logFile, "GPS Worker Searching for Fix");
 
       #endif
       
@@ -105,7 +98,7 @@ void GPSWorkerFunc(void * parameter) {
         xTaskNotify(GPSMon, 0, eSetValueWithOverwrite);
         vTaskDelay(10);
         if (xTaskNotifyWait(0, 0, &notificationValue, pdMS_TO_TICKS(60000))) {
-          vTaskDelete(GPSWorker);
+          vTaskDelete(NULL);  // Use NULL to delete current task
         }
       } 
       else if (millis() - loopStart > WAIT_SECS) {
@@ -114,14 +107,14 @@ void GPSWorkerFunc(void * parameter) {
           xTaskNotify(GPSMon, 1, eSetValueWithOverwrite);
           vTaskDelay(10);
           if (xTaskNotifyWait(0, 0, &notificationValue, pdMS_TO_TICKS(60000))) {
-            vTaskDelete(GPSWorker);
+            vTaskDelete(NULL);  // Use NULL to delete current task
           }
         }  
         else {
           xTaskNotify(GPSMon, -1, eSetValueWithOverwrite);
           vTaskDelay(10);
           if (xTaskNotifyWait(0, 0, &notificationValue, pdMS_TO_TICKS(60000))) {
-            vTaskDelete(GPSWorker);
+            vTaskDelete(NULL);  // Use NULL to delete current task
           }
         }
       }
@@ -171,20 +164,13 @@ void GPSMonitorFunc(void * parameter) {
     //   Serial.print(gps.sentencesWithFix());
     //   Serial.println(" s");
     // #endif
-    #ifdef DEBUG_GPS
-      UBaseType_t freeHeap = uxTaskGetStackHighWaterMark(NULL);
-      Serial.print("GPS Monitor Free Heap: ");
-      Serial.println(freeHeap);
-      appendFile(SD, logFile, "GPS Monitor Free Heap:");
-      appendFile(SD, logFile, String(freeHeap).c_str());
-    #endif
       
     switch (notificationValue) {
       
       case 0:
         #ifdef DEBUG_GPS
           Serial.println("GPS data received is IDEAL");
-          appendFile(SD, logFile, "GPS data received is IDEAL");
+          toLogFile(SD, logFile, "GPS data received is IDEAL");
         #endif
         d = gps.date;
         t = gps.time;
@@ -212,13 +198,13 @@ void GPSMonitorFunc(void * parameter) {
 
         gpsComplete = true;
         vTaskDelay(50);
-        vTaskDelete(GPSMon);
+        vTaskDelete(NULL);  // Use NULL to delete current task
         break;
 
       case 1:
         #ifdef DEBUG_GPS
           Serial.println("GPS data received is NOT IDEAL");
-          appendFile(SD, logFile, "GPS data received is NOT IDEAL");
+          toLogFile(SD, logFile, "GPS data received is NOT IDEAL");
         #endif
         d = gps.date;
         t = gps.time;
@@ -245,7 +231,7 @@ void GPSMonitorFunc(void * parameter) {
         
         gpsComplete = true;
         vTaskDelay(50);
-        vTaskDelete(GPSMon);
+        vTaskDelete(NULL);  // Use NULL to delete current task
         break;
 
       default:
@@ -254,7 +240,7 @@ void GPSMonitorFunc(void * parameter) {
         #ifdef DEBUG_GPS
           Serial.println("Failed To receive new GPS data");
           Serial.println(gpsBuffer);
-          appendFile(SD, logFile, "Failed To receive new GPS data");
+          toLogFile(SD, logFile, "Failed To receive new GPS data");
         #endif
         
         GPS.sendCommand(PMTK_STANDBY);
@@ -264,7 +250,8 @@ void GPSMonitorFunc(void * parameter) {
 
         gpsComplete = true;
         vTaskDelay(50);
-        vTaskDelete(GPSMon);
+        vTaskDelete(NULL);  // Use NULL to delete current task
+        break;  // Added break for completeness
     }
 
  
@@ -276,7 +263,7 @@ void GPSMonitorFunc(void * parameter) {
     #ifdef DEBUG_GPS
       Serial.println("Failed To receive new GPS data");
       Serial.println(gpsBuffer);
-      appendFile(SD, logFile, "Failed To receive new GPS data\n");
+      toLogFile(SD, logFile, "Failed To receive new GPS data");
     #endif
 
       GPS.sendCommand(PMTK_STANDBY);
@@ -286,8 +273,7 @@ void GPSMonitorFunc(void * parameter) {
 
       gpsComplete = true;
       vTaskDelay(50);
-      vTaskDelete(GPSMon);
-      vTaskDelete(GPSWorker);
+      vTaskDelete(NULL);  // Use NULL to delete current task
     
   }
 
