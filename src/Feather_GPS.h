@@ -67,7 +67,7 @@ void GPSWorkerFunc(void * parameter) {
     static int ms = 500;
     unsigned long start = millis();
 
-    if (xSemaphoreTake( serialSemaphore, (TickType_t) 10) == pdTRUE) {
+    if (xSemaphoreTake( serialSemaphore, (TickType_t) 1000) == pdTRUE) {
       do
       {
         while (GPS.available()){
@@ -92,9 +92,7 @@ void GPSWorkerFunc(void * parameter) {
 
       #endif
       
-      if (gps.location.isUpdated() &&
-          gps.satellites.value() > 5) {
-          
+      if (gps.location.isUpdated() && gps.satellites.value() > 5) { 
         xTaskNotify(GPSMon, 0, eSetValueWithOverwrite);
         vTaskDelay(10);
         if (xTaskNotifyWait(0, 0, &notificationValue, pdMS_TO_TICKS(60000))) {
@@ -102,8 +100,7 @@ void GPSWorkerFunc(void * parameter) {
         }
       } 
       else if (millis() - loopStart > WAIT_SECS) {
-        if (gps.location.isUpdated() &&
-                  gps.satellites.value() > 0) {
+        if (gps.location.isUpdated() && gps.satellites.value() > 0) {
           xTaskNotify(GPSMon, 1, eSetValueWithOverwrite);
           vTaskDelay(10);
           if (xTaskNotifyWait(0, 0, &notificationValue, pdMS_TO_TICKS(60000))) {

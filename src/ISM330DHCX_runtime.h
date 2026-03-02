@@ -142,7 +142,7 @@ void ISM330DHCX_worker(void * parameter) {
     // ms = millis();
     bool success = false;
     while(!success) {
-      if (xSemaphoreTake( i2cSemaphore, (TickType_t) 10) == pdTRUE) {
+      if (xSemaphoreTake( i2cSemaphore, (TickType_t) 1000) == pdTRUE) {
         
         // imuTime = rtc.now();
         // int MS = millis() % 1000;

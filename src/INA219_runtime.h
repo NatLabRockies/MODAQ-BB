@@ -21,7 +21,7 @@ void INA219_worker(void * parameter) {
     ms = millis();
     success = false;
     while(!success) {
-      if (xSemaphoreTake( i2cSemaphore, (TickType_t) 10) == pdTRUE) {
+      if (xSemaphoreTake( i2cSemaphore, (TickType_t) 1000) == pdTRUE) {
         // inaTime = rtc.now();
         // int MS = millis() % 1000;
         double uptime = (rtc.now().unixtime() - bootTime) / 3600.0; //Note: vulnerable to Y2038 problem

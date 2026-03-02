@@ -327,7 +327,7 @@ void setup()
   uartSemaphore = xSemaphoreCreateMutex();
 
   // Create Directories and Initialize the file names
-  if (xSemaphoreTake(uartSemaphore, (TickType_t)10) == pdTRUE)
+  if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE)
   {
     
     #ifdef DEBUG_MAIN
@@ -424,7 +424,7 @@ void loop()
 #ifdef DEBUG_MAIN
     Serial.print(" -- Awoke from External RTC interrupt -- ");
     toLogFile(SD, logFile, " -- Awoke from External RTC interrupt -- ");
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -432,7 +432,7 @@ void loop()
     printTime(now);
 #endif
 
-    if (xSemaphoreTake(uartSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE)
     {
       char timeBuffer[32] = "YYYYMMDD-hhmmss";
       rtc.now().toString(timeBuffer);
@@ -559,7 +559,7 @@ void loop()
     appendFile(SD, satFile, satData);
 
     digitalWrite(SAT_SLEEP, LOW);
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -608,7 +608,7 @@ void loop()
     Serial.println("Start Case 1");
     toLogFile(SD, logFile, "Start Case 1");
 #endif
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -668,7 +668,7 @@ void loop()
       }
     }
 
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -716,7 +716,7 @@ void loop()
     Serial.println("Start Case 2");
     toLogFile(SD, logFile, "Start Case 2");
 #endif
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -776,7 +776,7 @@ void loop()
 #endif
       }
     }
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -807,7 +807,7 @@ void loop()
     toLogFile(SD, logFile, "Start Default Case");
 #endif
 
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -822,7 +822,7 @@ void loop()
 // #endif
 
     ///*
-    if (xSemaphoreTake(uartSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE)
     {
 #ifdef DEBUG_MAIN
       Serial.println("  Creating New DataFiles  ");
@@ -901,7 +901,7 @@ void loop()
       }
     }
 
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)10) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
@@ -929,7 +929,7 @@ void loop()
 
   if (setClock)
   {
-    if (xSemaphoreTake(i2cSemaphore, (TickType_t)100) == pdTRUE)
+    if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       rtc.adjust(DateTime(d.year(), d.month(), d.day(), t.hour(), t.minute(), t.second()));
       xSemaphoreGive(i2cSemaphore);
