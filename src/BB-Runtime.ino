@@ -219,6 +219,7 @@ void setup()
   vTaskDelay(100);
   GPS.sendCommand(PMTK_STANDBY);
   vTaskDelay(1000);
+  gps = TinyGPSPlus();
 #ifdef DEBUG_MAIN
   Serial.println("Adafruit feather GPS setup commands sent and put to sleep");
 #endif

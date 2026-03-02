@@ -60,7 +60,7 @@ void GPSWorkerFunc(void * parameter) {
   // GPS Worker
   
   unsigned long loopStart = millis();
-  gps = TinyGPSPlus();
+  //gps = TinyGPSPlus();
   while (true) {
 
     uint32_t notificationValue;
