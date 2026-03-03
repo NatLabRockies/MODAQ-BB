@@ -72,8 +72,13 @@ void toLogFile(fs::FS &fs, const char *path, const char *message) {
   }
   char dateBuffer[32] = "MM/DD/YYYY";
   char timeBuffer[32] = "hh:mm:ss";
-  rtc.now().toString(dateBuffer);
-  rtc.now().toString(timeBuffer);
+  // BUG FIX: Acquire i2cSemaphore before accessing RTC over I2C.
+  // Without this, concurrent I2C access from worker tasks corrupts the bus and causes reboots.
+  if (xSemaphoreTake(i2cSemaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
+    rtc.now().toString(dateBuffer);
+    rtc.now().toString(timeBuffer);
+    xSemaphoreGive(i2cSemaphore);
+  }
   snprintf(timestamped_message, bufSize, "[%s %s] %s", dateBuffer, timeBuffer, message);
   appendFile(fs, path, timestamped_message);
   free(timestamped_message);

@@ -71,7 +71,7 @@ void INA219_worker(void * parameter) {
     }
   }
 
-  toLogFile(SD, logFile, "Power Task Finished\n");
+  toLogFile(SD, logFile, "Power Task Finished");
   pwrComplete = true;
   vTaskDelete(NULL);  // Use NULL to delete current task
 }

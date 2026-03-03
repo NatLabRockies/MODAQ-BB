@@ -125,6 +125,12 @@ const char *logDir = "/log";
 #include "Feather_GPS.h"
 #include "IRIDIUM_runtime.h"
 
+// IridiumSBD callback - called during long modem operations to yield CPU and prevent WDT reboot
+bool ISBDCallback() {
+  vTaskDelay(10);  // Yield to other FreeRTOS tasks
+  return true;     // Return true to continue operation
+}
+
 const uint64_t uS_TO_S_FACTOR = 1000000ULL;                     /* Conversion factor for micro seconds to seconds */
 const int TIME_TO_SLEEP = 600;                                  /* Time ESP32 will go to sleep for Data Colection (in seconds) */
 const uint8_t EXT_RTC_COUNTDOWN_TIMER = 1;                     // external RTC sleep timer(Must be < 255)
@@ -133,8 +139,6 @@ const unsigned long SAT_TRANSMISSION_COOLDOWN = 10*60*1000; // Minimum time betw
 unsigned long lastSatelliteTransmissionTime = 0;
 
 char datafile[] = "";
-
-RTC_DATA_ATTR int bootCount = 0;
 
 const bool GPSECHO = false;
 
@@ -171,7 +175,40 @@ void setup()
     // will pause Zero, Leonardo, etc until serial console opens
     delay(1);
   }
+
+  // Log reset reason to help diagnose reboots
+  esp_reset_reason_t resetReason = esp_reset_reason();
+  Serial.print("Reset reason: ");
+  switch (resetReason) {
+    case ESP_RST_POWERON:  Serial.println("Power-on"); break;
+    case ESP_RST_SW:       Serial.println("Software reset"); break;
+    case ESP_RST_PANIC:    Serial.println("Exception/panic"); break;
+    case ESP_RST_INT_WDT:  Serial.println("Interrupt watchdog"); break;
+    case ESP_RST_TASK_WDT: Serial.println("Task watchdog"); break;
+    case ESP_RST_WDT:      Serial.println("Other watchdog"); break;
+    case ESP_RST_DEEPSLEEP: Serial.println("Deep sleep"); break;
+    case ESP_RST_BROWNOUT: Serial.println("Brownout"); break;
+    default:               Serial.printf("Other: %d\n", resetReason); break;
+  }
+  Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
 #endif
+
+  // Store reset reason string for logging to file later (before SD is initialized)
+  const char* resetReasonStr;
+  {
+    esp_reset_reason_t resetReason2 = esp_reset_reason();
+    switch (resetReason2) {
+      case ESP_RST_POWERON:   resetReasonStr = "Power-on"; break;
+      case ESP_RST_SW:        resetReasonStr = "Software reset"; break;
+      case ESP_RST_PANIC:     resetReasonStr = "Exception/panic"; break;
+      case ESP_RST_INT_WDT:   resetReasonStr = "Interrupt watchdog"; break;
+      case ESP_RST_TASK_WDT:  resetReasonStr = "Task watchdog"; break;
+      case ESP_RST_WDT:       resetReasonStr = "Other watchdog"; break;
+      case ESP_RST_DEEPSLEEP: resetReasonStr = "Deep sleep"; break;
+      case ESP_RST_BROWNOUT:  resetReasonStr = "Brownout"; break;
+      default:                resetReasonStr = "Unknown"; break;
+    }
+  }
 
   if (!rtc.begin())
   {
@@ -219,7 +256,7 @@ void setup()
   vTaskDelay(100);
   GPS.sendCommand(PMTK_STANDBY);
   vTaskDelay(1000);
-  gps = TinyGPSPlus();
+
 #ifdef DEBUG_MAIN
   Serial.println("Adafruit feather GPS setup commands sent and put to sleep");
 #endif
@@ -358,6 +395,11 @@ void setup()
       createDir(SD, logDir);
       writeFile(SD, logFile, "System Booted\nDirectories and Data Files Created\n");
 
+      // Log reset reason
+      snprintf(logBuffer, sizeof(logBuffer), "Reset reason: %s", resetReasonStr);
+      appendFile(SD, logFile, logBuffer);
+      appendFile(SD, logFile, "\n");
+
       
 #ifdef DEBUG_MAIN
       listDir(SD, "/", 0);
@@ -387,6 +429,13 @@ void loop()
   bool summarizeNow = false;
   int timeSlept;
   int state = -1;
+
+#ifdef DEBUG_MAIN
+  // Log free heap at start of each loop iteration to track memory leaks
+  sprintf(logBuffer, "Loop start - Free heap: %u bytes", ESP.getFreeHeap());
+  Serial.println(logBuffer);
+  toLogFile(SD, logFile, logBuffer);
+#endif
   
   // Check interrupt flags first (set by ISRs during runtime)
   // Use critical section to prevent race conditions with ISRs
@@ -422,21 +471,27 @@ void loop()
     toLogFile(SD, logFile, "Start Case 0");
 #endif
     digitalWrite(SAT_SLEEP, HIGH);
-#ifdef DEBUG_MAIN
-    Serial.print(" -- Awoke from External RTC interrupt -- ");
-    toLogFile(SD, logFile, " -- Awoke from External RTC interrupt -- ");
+    // BUG FIX: Read RTC and initialize shortSleep outside DEBUG block
     if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
+    shortSleep = now.unixtime();
+#ifdef DEBUG_MAIN
+    Serial.print(" -- Awoke from External RTC interrupt -- ");
+    toLogFile(SD, logFile, " -- Awoke from External RTC interrupt -- ");
     printTime(now);
 #endif
 
     if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE)
     {
       char timeBuffer[32] = "YYYYMMDD-hhmmss";
-      rtc.now().toString(timeBuffer);
+      // BUG FIX: Acquire i2cSemaphore for RTC access
+      if (xSemaphoreTake(i2cSemaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        rtc.now().toString(timeBuffer);
+        xSemaphoreGive(i2cSemaphore);
+      }
 
       // Create new data files with updated time stamp
       sprintf(oldpwrFile, "%s", pwrFile);
@@ -614,6 +669,7 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
+    shortSleep = now.unixtime();  // BUG FIX: Initialize shortSleep (was uninitialized in Case 1)
 #ifdef DEBUG_MAIN
     Serial.print(" -- Awoke from IMU interrupt -- ");
     toLogFile(SD, logFile, " -- Awoke from IMU interrupt -- ");
@@ -631,41 +687,62 @@ void loop()
     toLogFile(SD, logFile, "Running IMU interrupt Loop . . . . . . ");
 #endif
 
-    while (!tasksComplete)
+    // BUG FIX: Added timeouts to prevent infinite hang if tasks never complete (causes WDT reboot)
     {
-      vTaskDelay(250);
-      if (gpsComplete)
+      unsigned long taskWaitStart = millis();
+      const unsigned long TASK_OUTER_TIMEOUT = 120000; // 2 minute outer timeout
+      const unsigned long TASK_INNER_TIMEOUT = 30000;  // 30 second inner timeout
+      while (!tasksComplete)
       {
-        tasksComplete = true;
-        while (!summarizeNow)
+        if ((millis() - taskWaitStart) > TASK_OUTER_TIMEOUT) {
+          Serial.println("TIMEOUT: Case 1 outer task wait exceeded - forcing completion");
+          toLogFile(SD, logFile, "TIMEOUT: Case 1 outer task wait exceeded");
+          tasksComplete = true;
+          gpsComplete = true;
+          break;
+        }
+        vTaskDelay(250);
+        if (gpsComplete)
         {
-          if (pwrComplete && imuComplete)
+          tasksComplete = true;
+          unsigned long innerWaitStart = millis();
+          while (!summarizeNow)
           {
+            if (pwrComplete && imuComplete)
+            {
 #ifdef DEBUG_MAIN
-            Serial.println("Remaining Tasks Cleaned Up");
-            toLogFile(SD, logFile, "Remaining Tasks Cleaned Up");
+              Serial.println("Remaining Tasks Cleaned Up");
+              toLogFile(SD, logFile, "Remaining Tasks Cleaned Up");
 #endif
 
-            combine_data_buffers();
+              combine_data_buffers();
 #ifdef DEBUG_MAIN
-            Serial.print("Collected Data: ");
-            Serial.println(fileBuffer);
+              Serial.print("Collected Data: ");
+              Serial.println(fileBuffer);
 #endif
-            summarizeNow = true;
-          }
-          else
-          {
+              summarizeNow = true;
+            }
+            else if ((millis() - innerWaitStart) > TASK_INNER_TIMEOUT)
+            {
+              Serial.println("TIMEOUT: Case 1 inner wait - proceeding anyway");
+              toLogFile(SD, logFile, "TIMEOUT: Case 1 inner wait - proceeding anyway");
+              combine_data_buffers();
+              summarizeNow = true;
+            }
+            else
+            {
 #ifdef DEBUG_MAIN
-            Serial.println("Processes have not Finished");
-            toLogFile(SD, logFile, "Processes have not Finished");
+              Serial.println("Processes have not Finished");
+              toLogFile(SD, logFile, "Processes have not Finished");
 #endif
-            vTaskDelay(250);
+              vTaskDelay(250);
+            }
           }
+#ifdef DEBUG_MAIN
+          Serial.println("IMU interrupt Tasks Complete");
+          toLogFile(SD, logFile, "IMU interrupt Tasks Complete");
+#endif
         }
-#ifdef DEBUG_MAIN
-        Serial.println("IMU interrupt Tasks Complete");
-        toLogFile(SD, logFile, "IMU interrupt Tasks Complete");
-#endif
       }
     }
 
@@ -745,6 +822,7 @@ void loop()
       if (gpsComplete)
       {
         tasksComplete = true;
+        unsigned long case2InnerWait = millis();
         while (!summarizeNow)
         {
           if (pwrComplete && imuComplete)
@@ -759,6 +837,13 @@ void loop()
             Serial.print("Collected Data: ");
             Serial.println(fileBuffer);
 #endif
+            summarizeNow = true;
+          }
+          else if ((millis() - case2InnerWait) > 30000)
+          {
+            Serial.println("TIMEOUT: Case 2 inner wait - proceeding anyway");
+            toLogFile(SD, logFile, "TIMEOUT: Case 2 inner wait - proceeding anyway");
+            combine_data_buffers();
             summarizeNow = true;
           }
           else
@@ -783,12 +868,18 @@ void loop()
       xSemaphoreGive(i2cSemaphore);
     }
     wakeup = now.unixtime() - shortSleep;
+    {
+      // BUG FIX: Clamp sleep duration to prevent unsigned underflow → huge sleep value or immediate reboot
+      int sleepDuration = TIME_TO_SLEEP - wakeup;
+      if (sleepDuration < 10) sleepDuration = 10;  // Minimum 10 seconds
+      if (sleepDuration > TIME_TO_SLEEP) sleepDuration = TIME_TO_SLEEP;
 #ifdef DEBUG_MAIN
-    snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP - wakeup);
-    Serial.println(logBuffer);
-    toLogFile(SD, logFile, logBuffer);
+      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", sleepDuration);
+      Serial.println(logBuffer);
+      toLogFile(SD, logFile, logBuffer);
 #endif
-    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - wakeup) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((uint64_t)sleepDuration * uS_TO_S_FACTOR);
+    }
     blinkRed(1);
 #ifdef DEBUG_LIGHT
     Serial.println("End Case 2");
@@ -831,7 +922,11 @@ void loop()
 #endif
 
       char timeBuffer[32] = "YYYYMMDD-hhmmss";
-      rtc.now().toString(timeBuffer);
+      // BUG FIX: Acquire i2cSemaphore for RTC access
+      if (xSemaphoreTake(i2cSemaphore, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        rtc.now().toString(timeBuffer);
+        xSemaphoreGive(i2cSemaphore);
+      }
 
       sprintf(pwrFile, "%s/pwr-data-%s.csv", pwrDir, timeBuffer);
       createDir(SD, pwrDir);
@@ -876,6 +971,7 @@ void loop()
       if (gpsComplete)
       {
         tasksComplete = true;
+        unsigned long defaultInnerWait = millis();
         while (!summarizeNow)
         {
           if (pwrComplete && imuComplete)
@@ -884,6 +980,12 @@ void loop()
             Serial.println("Remaining Tasks Cleaned Up");
             toLogFile(SD, logFile, "Remaining Tasks Cleaned Up");
 #endif
+            summarizeNow = true;
+          }
+          else if ((millis() - defaultInnerWait) > 30000)
+          {
+            Serial.println("TIMEOUT: Default case inner wait - proceeding anyway");
+            toLogFile(SD, logFile, "TIMEOUT: Default case inner wait - proceeding anyway");
             summarizeNow = true;
           }
           else
@@ -908,8 +1010,12 @@ void loop()
       xSemaphoreGive(i2cSemaphore);
     }
     wakeup = now.unixtime() - shortSleep;
+    // BUG FIX: Clamp sleep duration to prevent unsigned underflow
+    int defaultSleepDuration = TIME_TO_SLEEP - wakeup;
+    if (defaultSleepDuration < 10) defaultSleepDuration = 10;
+    if (defaultSleepDuration > TIME_TO_SLEEP) defaultSleepDuration = TIME_TO_SLEEP;
 #ifdef DEBUG_MAIN
-    snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP - wakeup);
+    snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", defaultSleepDuration);
     Serial.println(logBuffer);
     toLogFile(SD, logFile, logBuffer);
 #endif
@@ -919,7 +1025,7 @@ void loop()
     Serial.println("End Default Case");
     toLogFile(SD, logFile, "End Default Case");
 #endif
-    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - wakeup) * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup((uint64_t)defaultSleepDuration * uS_TO_S_FACTOR);
   }
 
 #ifdef DEBUG_MAIN
