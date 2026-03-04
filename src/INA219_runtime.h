@@ -54,7 +54,7 @@ void INA219_worker(void * parameter) {
           toLogFile(SD, logFile, "Power Data Logged");
         #endif
 
-        sprintf(pwrBuffer, "%s,%s,%4.2f,%4.2f,%4.2f,%.2f",dateBuffer, timeBuffer, busvoltage, current_mA, power_mW, uptime);
+        snprintf(pwrBuffer, sizeof(pwrBuffer), "%s,%s,%4.2f,%4.2f,%4.2f,%.2f",dateBuffer, timeBuffer, busvoltage, current_mA, power_mW, uptime);
         
         appendFile(SD, pwrFile, pwrBuffer);
 
@@ -64,7 +64,7 @@ void INA219_worker(void * parameter) {
       } else {
         vTaskDelay(50);
         #ifdef DEBUG_PWR
-          Serial.println("stuck outer");
+          Serial.println("INA219 stuck outer");
           toLogFile(SD, logFile, "INA219 stuck outer");
         #endif
       } 

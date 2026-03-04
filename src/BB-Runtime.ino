@@ -816,8 +816,18 @@ void loop()
     toLogFile(SD, logFile, "Running Internal RTC interrupt Loop . . . . . . ");
 #endif
 
+    {
+      unsigned long case2OuterWait = millis();
+      const unsigned long CASE2_OUTER_TIMEOUT = 120000; // 2 minute outer timeout
     while (!tasksComplete)
     {
+      if ((millis() - case2OuterWait) > CASE2_OUTER_TIMEOUT) {
+        Serial.println("TIMEOUT: Case 2 outer task wait exceeded - forcing completion");
+        toLogFile(SD, logFile, "TIMEOUT: Case 2 outer task wait exceeded");
+        tasksComplete = true;
+        gpsComplete = true;
+        break;
+      }
       vTaskDelay(250);
       if (gpsComplete)
       {
@@ -862,6 +872,7 @@ void loop()
 #endif
       }
     }
+    } // end Case 2 outer timeout scope
     if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {
       now = rtc.now();
@@ -965,8 +976,18 @@ void loop()
     toLogFile(SD, logFile, "Running Initial Boot Loop . . . . . . ");
 #endif
 
+    {
+      unsigned long defaultOuterWait = millis();
+      const unsigned long DEFAULT_OUTER_TIMEOUT = 120000; // 2 minute outer timeout
     while (!tasksComplete)
     {
+      if ((millis() - defaultOuterWait) > DEFAULT_OUTER_TIMEOUT) {
+        Serial.println("TIMEOUT: Default case outer task wait exceeded - forcing completion");
+        toLogFile(SD, logFile, "TIMEOUT: Default case outer task wait exceeded");
+        tasksComplete = true;
+        gpsComplete = true;
+        break;
+      }
       vTaskDelay(250);
       if (gpsComplete)
       {
@@ -1003,6 +1024,7 @@ void loop()
 #endif
       }
     }
+    } // end Default case outer timeout scope
 
     if (xSemaphoreTake(i2cSemaphore, portMAX_DELAY) == pdTRUE)
     {

@@ -177,7 +177,7 @@ void ISM330DHCX_worker(void * parameter) {
           toLogFile(SD, logFile, "IMU Data Updated");
         #endif
 
-        sprintf(imuBuffer, "%s,%s,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%3.1f,%i",dateBuffer, timeBuffer, 
+        snprintf(imuBuffer, sizeof(imuBuffer), "%s,%s,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%4.2f,%3.1f,%i",dateBuffer, timeBuffer, 
                   ax, ay, az, gx, gy, gz, mx, my, mz, temp, imuWakeupCount);
                   
         appendFile(SD, imuFile, imuBuffer);
