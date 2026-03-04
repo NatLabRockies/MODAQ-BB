@@ -77,14 +77,22 @@ void GPSWorkerFunc(void * parameter) {
       while (millis() - start < ms);
       xSemaphoreGive(serialSemaphore);
 
+      // BUG FIX: Cache isUpdated() result — calling it consumes the flag,
+      // so a second call in the same iteration always returns false.
+      // Use isValid() for the timeout fallback since we just need any recent fix.
+      bool locationUpdated = gps.location.isUpdated();
+      int satCount = gps.satellites.value();
+
       #ifdef DEBUG_GPS
         Serial.print("GPS Worker Searching for Fix - ");
         Serial.print("Location Age: ");
         Serial.print(gps.location.age());
         Serial.print(" | Number of Satellites: ");
-        Serial.print(gps.satellites.value());
+        Serial.print(satCount);
         Serial.print(" | sentenceWithFix: ");
         Serial.print(gps.sentencesWithFix());
+        Serial.print(" | locationUpdated: ");
+        Serial.print(locationUpdated);
         Serial.print(" | Time in Loop: ");
         Serial.print(( millis() - loopStart) / 1000);
         Serial.println(" s");
@@ -92,7 +100,7 @@ void GPSWorkerFunc(void * parameter) {
 
       #endif
       
-      if (gps.location.isUpdated() && gps.satellites.value() > 5) { 
+      if (locationUpdated && satCount > 5) { 
         xTaskNotify(GPSMon, 0, eSetValueWithOverwrite);
         vTaskDelay(10);
         if (xTaskNotifyWait(0, 0, &notificationValue, pdMS_TO_TICKS(60000))) {
@@ -100,7 +108,7 @@ void GPSWorkerFunc(void * parameter) {
         }
       } 
       else if (millis() - loopStart > WAIT_SECS) {
-        if (gps.location.isUpdated() && gps.satellites.value() > 0) {
+        if (gps.location.isValid() && satCount > 0) {
           xTaskNotify(GPSMon, 1, eSetValueWithOverwrite);
           vTaskDelay(10);
           if (xTaskNotifyWait(0, 0, &notificationValue, pdMS_TO_TICKS(60000))) {
