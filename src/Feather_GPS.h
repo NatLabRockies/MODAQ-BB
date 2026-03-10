@@ -196,7 +196,7 @@ void GPSMonitorFunc(void * parameter) {
         gpsComplete = true;
         vTaskDelay(50);
         vTaskDelete(NULL);  // Use NULL to delete current task
-        break;  // Added missing break
+        break;
 
       case 1:
         #ifdef DEBUG_GPS
@@ -229,9 +229,9 @@ void GPSMonitorFunc(void * parameter) {
         gpsComplete = true;
         vTaskDelay(50);
         vTaskDelete(NULL);  // Use NULL to delete current task
-        break;  // Added missing break
+        break;
 
-      default: 
+      default:
 
         sprintf(gpsBuffer, "No Fix ,,,,,,,,,");
         #ifdef DEBUG_GPS

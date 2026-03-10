@@ -71,7 +71,8 @@ SemaphoreHandle_t uartSemaphore = NULL;
 DateTime now;
 volatile bool EXT_RTC_INT = false;
 volatile bool EXT_IMU_INT = false;
-int shortSleep, wakeup;
+uint32_t collectionStartUnixSec = 0;
+uint32_t collectionDurationSec = 0;
 
 float busvoltage;
 float current_mA;
@@ -126,7 +127,7 @@ const char *logDir = "/log";
 #include "IRIDIUM_runtime.h"
 
 const uint64_t uS_TO_S_FACTOR = 1000000ULL;                     /* Conversion factor for micro seconds to seconds */
-const int TIME_TO_SLEEP = 600;                                  /* Time ESP32 will go to sleep for Data Colection (in seconds) */
+const int SLEEP_DURATION_SECONDS = 600;                         /* Time ESP32 will go to sleep for Data Colection (in seconds) */
 const uint8_t EXT_RTC_COUNTDOWN_TIMER = 1;                     // external RTC sleep timer(Must be < 255)
 PCF8523TimerClockFreq countdown_unit = PCF8523_FrequencyHour; // Set the countdown timer frequency to 1 hour
 const unsigned long SAT_TRANSMISSION_COOLDOWN = 10*60*1000; // Minimum time between satellite transmissions in ms
@@ -385,7 +386,6 @@ void loop()
   vTaskDelay(5);
 
   bool summarizeNow = false;
-  int timeSlept;
   int state = -1;
   
   // Check interrupt flags first (set by ISRs during runtime)
@@ -432,6 +432,7 @@ void loop()
     }
     printTime(now);
 #endif
+    collectionStartUnixSec = now.unixtime();
 
     if (xSemaphoreTake(uartSemaphore, portMAX_DELAY) == pdTRUE)
     {
@@ -565,33 +566,33 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    timeSlept = now.unixtime() - shortSleep;
-    if (timeSlept < TIME_TO_SLEEP)
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
+    if (collectionDurationSec < SLEEP_DURATION_SECONDS)
     {
 #ifdef DEBUG_MAIN
-      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP - timeSlept);
+      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", SLEEP_DURATION_SECONDS - collectionDurationSec);
       Serial.println(logBuffer);
       toLogFile(SD, logFile, logBuffer);
 #endif
-      esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - timeSlept) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((SLEEP_DURATION_SECONDS - collectionDurationSec) * uS_TO_S_FACTOR);
     }
-    else if ((timeSlept > TIME_TO_SLEEP) && ((timeSlept - TIME_TO_SLEEP) < TIME_TO_SLEEP))
+    else if ((collectionDurationSec > SLEEP_DURATION_SECONDS) && ((collectionDurationSec - SLEEP_DURATION_SECONDS) < SLEEP_DURATION_SECONDS))
     {
 #ifdef DEBUG_MAIN
-      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", timeSlept - TIME_TO_SLEEP);
+      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", collectionDurationSec - SLEEP_DURATION_SECONDS);
       Serial.println(logBuffer);
       toLogFile(SD, logFile, logBuffer);
 #endif
-      esp_sleep_enable_timer_wakeup((timeSlept - TIME_TO_SLEEP) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((collectionDurationSec - SLEEP_DURATION_SECONDS) * uS_TO_S_FACTOR);
     }
     else
     {
 #ifdef DEBUG_MAIN
-      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP);
+      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", SLEEP_DURATION_SECONDS);
       Serial.println(logBuffer);
       toLogFile(SD, logFile, logBuffer);
 #endif
-      esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup(SLEEP_DURATION_SECONDS * uS_TO_S_FACTOR);
     }
     blinkRed(1);
 #ifdef DEBUG_LIGHT
@@ -674,33 +675,33 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    timeSlept = now.unixtime() - shortSleep;
-    if (timeSlept < TIME_TO_SLEEP)
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
+    if (collectionDurationSec < SLEEP_DURATION_SECONDS)
     {
 #ifdef DEBUG_MAIN
-      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP - timeSlept);
+      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", SLEEP_DURATION_SECONDS - collectionDurationSec);
       Serial.println(logBuffer);
       toLogFile(SD, logFile, logBuffer);
 #endif
-      esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - timeSlept) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((SLEEP_DURATION_SECONDS - collectionDurationSec) * uS_TO_S_FACTOR);
     }
-    else if ((timeSlept > TIME_TO_SLEEP) && ((timeSlept - TIME_TO_SLEEP) < TIME_TO_SLEEP))
+    else if ((collectionDurationSec > SLEEP_DURATION_SECONDS) && ((collectionDurationSec - SLEEP_DURATION_SECONDS) < SLEEP_DURATION_SECONDS))
     {
 #ifdef DEBUG_MAIN
-      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", timeSlept - TIME_TO_SLEEP);
+      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", collectionDurationSec - SLEEP_DURATION_SECONDS);
       Serial.println(logBuffer);
       toLogFile(SD, logFile, logBuffer);
 #endif
-      esp_sleep_enable_timer_wakeup((timeSlept - TIME_TO_SLEEP) * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup((collectionDurationSec - SLEEP_DURATION_SECONDS) * uS_TO_S_FACTOR);
     }
     else
     {
 #ifdef DEBUG_MAIN
-      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP);
+      snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", SLEEP_DURATION_SECONDS);
       Serial.println(logBuffer);
       toLogFile(SD, logFile, logBuffer);
 #endif
-      esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+      esp_sleep_enable_timer_wakeup(SLEEP_DURATION_SECONDS * uS_TO_S_FACTOR);
     }
     blinkRed(1);
 #ifdef DEBUG_LIGHT
@@ -722,7 +723,7 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    shortSleep = now.unixtime();
+    collectionStartUnixSec = now.unixtime();
 
 #ifdef DEBUG_MAIN
     Serial.print(" -- Awoke from ESP32 Internal RTC interrupt -- ");
@@ -782,13 +783,13 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    wakeup = now.unixtime() - shortSleep;
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
 #ifdef DEBUG_MAIN
-    snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP - wakeup);
+    snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", SLEEP_DURATION_SECONDS - collectionDurationSec);
     Serial.println(logBuffer);
     toLogFile(SD, logFile, logBuffer);
 #endif
-    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - wakeup) * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup((SLEEP_DURATION_SECONDS - collectionDurationSec) * uS_TO_S_FACTOR);
     blinkRed(1);
 #ifdef DEBUG_LIGHT
     Serial.println("End Case 2");
@@ -813,7 +814,7 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    shortSleep = now.unixtime();
+    collectionStartUnixSec = now.unixtime();
 
 // #ifdef DEBUG_MAIN
 //     Serial.println(" - - - - - - - - - - - - - - - - - - - - - - - ");
@@ -856,9 +857,9 @@ void loop()
     }
     //*/
 
-    if (TIME_TO_SLEEP < (WAIT_SECS / 1000))
+    if (SLEEP_DURATION_SECONDS < (WAIT_SECS / 1000))
     { // If the time to sleep is less than the GPS wait time, set the wait time
-      WAIT_SECS = (TIME_TO_SLEEP * 1000) - 5000;
+      WAIT_SECS = (SLEEP_DURATION_SECONDS * 1000) - 5000;
     }
 
     Task_INA219_Worker();
@@ -907,9 +908,9 @@ void loop()
       now = rtc.now();
       xSemaphoreGive(i2cSemaphore);
     }
-    wakeup = now.unixtime() - shortSleep;
+    collectionDurationSec = now.unixtime() - collectionStartUnixSec;
 #ifdef DEBUG_MAIN
-    snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", TIME_TO_SLEEP - wakeup);
+    snprintf(logBuffer, sizeof(logBuffer), "Sleeping for: %d s", SLEEP_DURATION_SECONDS - collectionDurationSec);
     Serial.println(logBuffer);
     toLogFile(SD, logFile, logBuffer);
 #endif
@@ -919,7 +920,7 @@ void loop()
     Serial.println("End Default Case");
     toLogFile(SD, logFile, "End Default Case");
 #endif
-    esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP - wakeup) * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup((SLEEP_DURATION_SECONDS - collectionDurationSec) * uS_TO_S_FACTOR);
   }
 
 #ifdef DEBUG_MAIN
@@ -937,7 +938,7 @@ void loop()
     }
   }
 
-  // esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  // esp_sleep_enable_timer_wakeup(SLEEP_DURATION_SECONDS * uS_TO_S_FACTOR);
 
   // Case to handle if the RTC interrupt happened while code was in another state
   // Use critical section to safely check volatile flags
